@@ -50,9 +50,9 @@ class RequestHandler:
         except RequestException as e:
             return None
 
-    def post(self, url, data=None, **kwargs):
+    def post(self, url, data=None, json=None, **kwargs):
         try:
-            resp = self.session.post(url, data=data, timeout=self.timeout, **kwargs)
+            resp = self.session.post(url, data=data, json=json, timeout=self.timeout, **kwargs)
             return resp
         except (Timeout, ConnectionError):
             return None
