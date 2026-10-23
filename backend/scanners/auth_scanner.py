@@ -11,6 +11,7 @@ def scan(forms, target_url, parameters=None, cookies=None, headers=None, **kwarg
     2. Credentials exposed in URL query string via HTTP GET (CWE-598).
     3. User enumeration on authentication / password recovery endpoints (CWE-204).
     4. Absence of brute-force rate limiting on credential verification endpoints (CWE-307).
+    5. Broken authentication / blank credential acceptance.
     """
     findings = []
     handler = RequestHandler(cookies=cookies, headers=headers)
@@ -36,6 +37,8 @@ def scan(forms, target_url, parameters=None, cookies=None, headers=None, **kwarg
         if key in seen:
             continue
         seen.add(key)
+
+        content_type = form.get("content_type", "form")
 
         # 1. Credentials submitted over unencrypted HTTP
         if urlparse(action).scheme != "https":
@@ -66,11 +69,9 @@ def scan(forms, target_url, parameters=None, cookies=None, headers=None, **kwarg
             )
 
         # 3. User Enumeration Check (CWE-204)
-        # Check if known user ('admin') gives distinct message/status compared to non-existent user
         if has_user_identifier:
             user_field = next((i.get("name") for i in inputs if any(k in i.get("name", "").lower() for k in ("user", "email", "login"))), None)
             if user_field:
-                content_type = form.get("content_type", "form")
                 known_data = {i.get("name"): i.get("value", "1") for i in inputs if i.get("name")}
                 known_data[user_field] = "admin"
                 if has_password:
@@ -92,7 +93,6 @@ def scan(forms, target_url, parameters=None, cookies=None, headers=None, **kwarg
                         known_text = resp_known.text.lower()
                         unknown_text = resp_unknown.text.lower()
 
-                        # Distinct responses indicate user enumeration
                         status_diff = (resp_known.status_code != resp_unknown.status_code)
                         message_diff = (
                             ("user not found" in unknown_text and "user not found" not in known_text) or
@@ -115,5 +115,33 @@ def scan(forms, target_url, parameters=None, cookies=None, headers=None, **kwarg
                             )
                 except Exception:
                     pass
+
+        # 4. Check for Rate Limiting / Brute-Force Protection (CWE-307)
+        # Test 10 rapid invalid login attempts against login/auth endpoints
+        if has_password and "login" in action.lower():
+            rate_limited = False
+            for i in range(10):
+                dummy_payload = {
+                    (next((inp.get("name") for inp in inputs if "user" in inp.get("name", "").lower() or "email" in inp.get("name", "").lower()), "username")): f"probe_{i}",
+                    (next((inp.get("name") for inp in inputs if "pass" in inp.get("name", "").lower()), "password")): f"invalid_pass_{i}",
+                }
+                r = handler.post(action, json=dummy_payload) if content_type == "json" else handler.post(action, data=dummy_payload)
+                if r is not None and r.status_code == 429:
+                    rate_limited = True
+                    break
+
+            if not rate_limited:
+                findings.append(
+                    {
+                        "severity": "medium",
+                        "url": action,
+                        "detail": (
+                            f"Missing Rate Limiting on authentication endpoint '{action}'. "
+                            f"The endpoint accepted repeated rapid login attempts without throttling or HTTP 429 enforcement, "
+                            f"exposing user accounts to automated credential stuffing and brute-force attacks."
+                        ),
+                        "payload": "10 rapid consecutive invalid authentication requests",
+                    }
+                )
 
     return findings

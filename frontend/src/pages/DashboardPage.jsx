@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { startScan, getAuth } from "../api/apiClient.js";
+import { startScan, getAuth, getScanHistory } from "../api/apiClient.js";
 
 const MODULES = [
   {
@@ -37,7 +37,7 @@ const MODULES = [
       </svg>
     ),
     title: "Broken Access Control",
-    desc: "Probes administrative pages and endpoints for missing authorisation checks.",
+    desc: "Probes administrative pages, debug dumps and object endpoints (BOLA/IDOR) for missing authorization.",
     category: "Privilege Gate"
   },
   {
@@ -49,7 +49,7 @@ const MODULES = [
       </svg>
     ),
     title: "Cryptographic Failures",
-    desc: "Verifies HTTPS enforcement, secure cookies and safe data-transport practices.",
+    desc: "Verifies HTTPS enforcement, HSTS headers, and secure cookie transport flags.",
     category: "Transport / TLS"
   },
   {
@@ -61,7 +61,7 @@ const MODULES = [
       </svg>
     ),
     title: "Authentication Failures",
-    desc: "Reviews login forms for weak session and brute-force protection.",
+    desc: "Reviews login forms for credential stuffing, missing rate limiting, and username enumeration.",
     category: "Session & Login"
   }
 ];
@@ -70,8 +70,24 @@ export default function DashboardPage() {
   const [url, setUrl] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const navigate = useNavigate();
   const authed = Boolean(getAuth());
+
+  useEffect(() => {
+    if (authed) {
+      setHistoryLoading(true);
+      getScanHistory()
+        .then((res) => {
+          if (res && res.scans) {
+            setHistory(res.scans);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setHistoryLoading(false));
+    }
+  }, [authed]);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -95,7 +111,7 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col">
       {/* BEGIN: HeroSection */}
-      <section className="border border-brand-border rounded-lg bg-brand-surface p-8 sm:p-10 md:p-12 mb-14 relative overflow-hidden" data-purpose="hero-module">
+      <section className="border border-brand-border rounded-lg bg-brand-surface p-8 sm:p-10 md:p-12 mb-10 relative overflow-hidden" data-purpose="hero-module">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
           {/* Left Column: Copy & Actions */}
           <div className="lg:col-span-8 flex flex-col">
@@ -103,15 +119,12 @@ export default function DashboardPage() {
               <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
               <span className="text-[11px] font-mono tracking-wider uppercase text-brand-muted">Vulnerability Scanner Engine</span>
             </div>
-            {/* Exact Headline */}
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-white leading-tight mb-5 max-w-2xl">
               Automated security scan for your web app
             </h1>
-            {/* Exact Body Copy */}
             <p className="text-sm sm:text-base text-zinc-300 leading-relaxed max-w-2xl mb-4 font-normal">
               Point Web Checker at any URL you control and get a clear report on the five most common online vulnerabilities — SQL injection, XSS, broken access control, cryptographic failures and authentication issues.
             </p>
-            {/* Exact Subtext */}
             <p className="text-xs sm:text-sm text-brand-muted mb-8 leading-normal max-w-xl">
               Scans are restricted to registered users. Sign in to start a scan and store your report history.
             </p>
@@ -205,6 +218,100 @@ export default function DashboardPage() {
         </div>
       </section>
       {/* END: HeroSection */}
+
+      {/* BEGIN: Saved Audit Reports Table (Available for Logged-in Users) */}
+      {authed && (
+        <section className="mb-14">
+          <div className="flex items-center justify-between mb-4 pb-2 border-b border-brand-border">
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+              </svg>
+              <h2 className="text-xs font-mono font-medium tracking-widest uppercase text-brand-muted">
+                SAVED AUDIT REPORTS
+              </h2>
+            </div>
+            <span className="text-[11px] font-mono text-zinc-500">
+              {history.length} {history.length === 1 ? "report" : "reports"} recorded
+            </span>
+          </div>
+
+          <div className="border border-brand-border rounded-lg bg-brand-surface overflow-hidden">
+            {historyLoading ? (
+              <div className="p-8 text-center text-xs font-mono text-zinc-500">
+                Loading audit reports…
+              </div>
+            ) : history.length === 0 ? (
+              <div className="p-8 text-center text-xs font-mono text-zinc-500">
+                No past security audits found. Enter a target URL above to launch your first scan.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-brand-black/60 border-b border-brand-border text-zinc-400 font-mono text-[11px] uppercase tracking-wider">
+                    <tr>
+                      <th className="px-5 py-3">Target Endpoint</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Risk Level</th>
+                      <th className="px-4 py-3">Findings</th>
+                      <th className="px-4 py-3">Audit Date</th>
+                      <th className="px-5 py-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-brand-border/60">
+                    {history.map((s) => {
+                      const sev = s.highestSeverity || "none";
+                      let badge = "bg-zinc-800 text-zinc-400 border-zinc-700";
+                      if (sev === "critical") badge = "bg-white text-black font-semibold";
+                      else if (sev === "high") badge = "bg-zinc-900 text-zinc-200 border-zinc-700";
+                      else if (sev === "medium") badge = "bg-zinc-900 text-zinc-400 border-zinc-800";
+                      else if (sev === "low") badge = "bg-zinc-900 text-zinc-500 border-zinc-850";
+
+                      return (
+                        <tr key={s.scanId} className="hover:bg-brand-subtle/50 transition-colors">
+                          <td className="px-5 py-3.5 font-mono text-white font-medium truncate max-w-xs sm:max-w-sm">
+                            {s.targetUrl}
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono uppercase ${
+                              s.status === "completed" ? "bg-teal-500/10 text-teal-400 border border-teal-500/30" : "bg-zinc-800 text-zinc-400"
+                            }`}>
+                              {s.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono uppercase border ${badge}`}>
+                              {sev}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5 font-mono text-zinc-300">
+                            {s.findingsCount}
+                          </td>
+                          <td className="px-4 py-3.5 font-mono text-zinc-500 text-[11px]">
+                            {s.createdAt || "Just now"}
+                          </td>
+                          <td className="px-5 py-3.5 text-right font-mono">
+                            <Link
+                              to={`/report/${s.scanId}`}
+                              className="inline-flex items-center gap-1 text-xs text-white hover:underline underline-offset-4 font-medium"
+                            >
+                              <span>View Report</span>
+                              <span>→</span>
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* BEGIN: VulnerabilitiesSection */}
       <section className="mb-14" data-purpose="modules-section">

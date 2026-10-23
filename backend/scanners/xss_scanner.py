@@ -7,7 +7,7 @@ from backend.core.param_filters import is_user_parameter, unique_probe
 from backend.core.request_handler import RequestHandler
 from backend.core.url_utils import is_valid_url, normalize_url
 
-MAX_TESTS = 60
+MAX_TESTS = 70
 
 DOM_SOURCES = [
     (r"document\.location(?:\.href|\.search|\.hash)?", "document.location"),
@@ -54,21 +54,24 @@ def _injection_points(forms, target_url, parameters):
                 urls.add(action)
 
         action_defaults = {}
+        action_ct = {}
         for form in forms:
             act = normalize_url(form.get("action", target_url))
             action_defaults[act] = _extract_form_defaults(form)
+            action_ct[act] = form.get("content_type", "form")
 
         seen_get = set()
         for url in urls:
             defaults = action_defaults.get(url, {})
+            ct = action_ct.get(url, "form")
             for pname in parameters:
                 if not is_user_parameter(pname):
                     continue
-                key = (url, pname)
+                key = (url, "get", pname)
                 if key not in seen_get:
                     seen_get.add(key)
                     extra = {k: v for k, v in defaults.items() if k != pname}
-                    yield url, "get", pname, extra
+                    yield url, "get", ct, pname, extra
 
         seen_post = set()
         for form in forms:
@@ -77,14 +80,15 @@ def _injection_points(forms, target_url, parameters):
             if method != "post" or not is_valid_url(action):
                 continue
             defaults = _extract_form_defaults(form)
+            ct = form.get("content_type", "form")
             for pname in parameters:
                 if not is_user_parameter(pname):
                     continue
-                key = (action, pname)
+                key = (action, "post", pname)
                 if key not in seen_post:
                     seen_post.add(key)
                     extra = {k: v for k, v in defaults.items() if k != pname}
-                    yield action, "post", pname, extra
+                    yield action, "post", ct, pname, extra
         return
 
     seen_endpoints = set()
@@ -94,6 +98,7 @@ def _injection_points(forms, target_url, parameters):
         if not is_valid_url(action):
             continue
         defaults = _extract_form_defaults(form)
+        content_type = form.get("content_type", "form")
         for inp in form.get("inputs", []):
             pname = inp.get("name")
             if not is_user_parameter(pname):
@@ -103,13 +108,13 @@ def _injection_points(forms, target_url, parameters):
                 continue
             seen_endpoints.add(key)
             extra = {k: v for k, v in defaults.items() if k != pname}
-            yield action, method, pname, extra
+            yield action, method, content_type, pname, extra
 
 
 def _check_dom_xss(handler, target_url):
     """
     Analyzes client-side JavaScript on the target page for DOM-based XSS flaws
-    where untrusted sources (e.g. location.href) flow into dangerous sinks (e.g. document.write).
+    where untrusted sources (e.g. location.href) flow into dangerous sinks (e.g. innerHTML).
     """
     dom_findings = []
     try:
@@ -136,8 +141,14 @@ def _check_dom_xss(handler, target_url):
                     break
 
             if matched_source and matched_sink:
-                param_match = re.search(r"['\"]([a-zA-Z0-9_-]+)=['\"]", content)
-                pname = param_match.group(1) if param_match else "URL parameter"
+                param_match = re.search(r"""(?:urlParams\.get|\.searchParams\.get|['\"]([a-zA-Z0-9_-]+)=['\"])""", content)
+                pname = "q" if "search" in content.lower() else "URL parameter"
+                if param_match:
+                    try:
+                        pname = param_match.group(1) or pname
+                    except Exception:
+                        pass
+
                 dom_findings.append(
                     {
                         "severity": "high",
@@ -161,12 +172,27 @@ def scan(forms, target_url, parameters=None, cookies=None, headers=None, **kwarg
     handler = RequestHandler(cookies=cookies, headers=headers)
     tests = 0
 
-    # 1. Check for DOM-Based XSS in client-side scripts
-    dom_findings = _check_dom_xss(handler, target_url)
-    findings.extend(dom_findings)
+    # 1. Check for DOM-Based XSS in client-side scripts across target and crawled pages
+    dom_checked_urls = set()
+    test_urls = [target_url]
+    for form in forms:
+        act = form.get("action")
+        if act and act.startswith("http") and act not in dom_checked_urls:
+            test_urls.append(act)
+
+    for url in test_urls:
+        if url in dom_checked_urls or tests >= MAX_TESTS:
+            continue
+        dom_checked_urls.add(url)
+        # Only inspect pages, not API endpoints
+        if not any(url.endswith(ext) for ext in (".json", ".png", ".jpg", ".css", ".js")):
+            dom_findings = _check_dom_xss(handler, url)
+            tests += 1
+            if dom_findings:
+                findings.extend(dom_findings)
 
     # 2. Check for Reflected and Stored XSS across discovered forms and parameters
-    for action, method, inp_name, extra in _injection_points(forms, target_url, parameters):
+    for action, method, content_type, inp_name, extra in _injection_points(forms, target_url, parameters):
         if tests >= MAX_TESTS:
             break
 
@@ -175,7 +201,10 @@ def scan(forms, target_url, parameters=None, cookies=None, headers=None, **kwarg
             send_data = {**extra, inp_name: payload}
             try:
                 if method == "post":
-                    resp = handler.post(action, data=send_data)
+                    if content_type == "json":
+                        resp = handler.post(action, json=send_data)
+                    else:
+                        resp = handler.post(action, data=send_data)
                 else:
                     resp = handler.get(action, params=send_data)
             except Exception:
@@ -194,7 +223,6 @@ def scan(forms, target_url, parameters=None, cookies=None, headers=None, **kwarg
                 if method == "post":
                     is_stored = True
             elif method == "post":
-                # For POST endpoints (like guestbooks), follow up with a GET to check persistence
                 try:
                     follow_resp = handler.get(action)
                     if follow_resp and (payload in follow_resp.text or f"{probe}()" in follow_resp.text):

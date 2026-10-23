@@ -1,6 +1,6 @@
 import json
 
-from flask import Blueprint, jsonify, send_file
+from flask import Blueprint, g, jsonify, send_file
 
 from backend.auth import login_required
 from backend.models.scan import Scan
@@ -20,6 +20,48 @@ def _load_scan(scan_id):
     return scan, jsonify({}), 200
 
 
+@report_blueprint.route("/history", methods=["GET"])
+@login_required
+def list_history():
+    """Returns the authenticated user's scan history and summary metrics."""
+    user_id = g.current_user.userId
+    scans = Scan.query.filter_by(userId=user_id).order_by(Scan.created_at.desc()).all()
+    history = []
+    for s in scans:
+        findings_count = 0
+        highest_severity = "none"
+        if s.results:
+            try:
+                res = json.loads(s.results)
+                cats = res.get("categories", {})
+                for f_list in cats.values():
+                    if isinstance(f_list, list):
+                        findings_count += len(f_list)
+                        for item in f_list:
+                            sev = item.get("severity", "info").lower()
+                            if sev == "critical":
+                                highest_severity = "critical"
+                            elif sev == "high" and highest_severity not in ("critical",):
+                                highest_severity = "high"
+                            elif sev == "medium" and highest_severity not in ("critical", "high"):
+                                highest_severity = "medium"
+                            elif sev == "low" and highest_severity not in ("critical", "high", "medium"):
+                                highest_severity = "low"
+            except Exception:
+                pass
+
+        history.append({
+            "scanId": s.scanId,
+            "targetUrl": s.targetUrl,
+            "status": s.status,
+            "progress": s.progress,
+            "findingsCount": findings_count,
+            "highestSeverity": highest_severity,
+            "createdAt": s.created_at.strftime("%Y-%m-%d %H:%M:%S") if getattr(s, "created_at", None) else None,
+        })
+    return jsonify({"scans": history}), 200
+
+
 @report_blueprint.route("/generate/<scan_id>", methods=["GET"])
 @login_required
 def generate(scan_id):
@@ -36,6 +78,7 @@ def generate(scan_id):
         "status": scan.status,
         "parameters": json.loads(scan.parameters) if scan.parameters else None,
         "categories": results.get("categories", {}),
+        "createdAt": scan.created_at.strftime("%Y-%m-%d %H:%M:%S") if getattr(scan, "created_at", None) else None,
     }
     return jsonify(payload), 200
 

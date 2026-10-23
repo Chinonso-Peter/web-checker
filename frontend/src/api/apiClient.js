@@ -104,6 +104,9 @@ export const getScanResult = (scanId) =>
 export const getReport = (scanId) =>
   request(`/report/generate/${scanId}`);
 
+export const getScanHistory = () =>
+  request("/report/history");
+
 export async function downloadReportPdf(scanId) {
   const auth = getAuth();
   const headers = auth ? { Authorization: `Bearer ${auth.token}` } : {};
