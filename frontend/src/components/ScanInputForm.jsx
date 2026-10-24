@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { startScan } from "../api/apiClient.js";
 
-// Supports both domains and localhost / IP addresses with optional ports and paths
-const URL_PATTERN = /^(https?):\/\/([a-zA-Z0-9-._]+)(:\d+)?([/\w .?&=%-]*)?$/i;
+// Supports domains and localhost / IP addresses with or without scheme
+const URL_PATTERN = /^(https?:\/\/)?([a-zA-Z0-9-._]+)(:\d+)?([/\w .?&=%-]*)?$/i;
 
 export default function ScanInputForm({ onStarted }) {
   const [url, setUrl] = useState("");
@@ -24,10 +24,24 @@ export default function ScanInputForm({ onStarted }) {
     setUrlFieldError(false);
     setError("");
 
-    const trimmed = url.trim();
-    if (!URL_PATTERN.test(trimmed)) {
-      triggerUrlError("INVALID PROTOCOL OR HOSTNAME (must start with http:// or https://)");
+    let trimmed = url.trim();
+    if (!trimmed) {
+      triggerUrlError("Please enter a target URL or domain");
       return;
+    }
+
+    if (!URL_PATTERN.test(trimmed)) {
+      triggerUrlError("INVALID HOSTNAME OR URL FORMAT");
+      return;
+    }
+
+    // Auto-prefix protocol if omitted
+    if (!/^https?:\/\//i.test(trimmed)) {
+      if (/^(localhost|127\.0\.0\.1)/i.test(trimmed)) {
+        trimmed = `http://${trimmed}`;
+      } else {
+        trimmed = `https://${trimmed}`;
+      }
     }
 
     const parameters = paramsText
@@ -79,7 +93,7 @@ export default function ScanInputForm({ onStarted }) {
             className={`w-full h-10 px-3.5 rounded bg-brand-black border ${
               urlFieldError ? "border-red-500" : "border-brand-border"
             } text-white text-xs font-mono placeholder:text-zinc-600 focus:outline-none focus:border-zinc-400 transition-colors`}
-            placeholder="http://localhost:8080/vulnerabilities/sqli/"
+            placeholder="cyprianz.com or localhost:8080/vulnerabilities/sqli/"
             value={url}
             onChange={(e) => {
               setUrl(e.target.value);

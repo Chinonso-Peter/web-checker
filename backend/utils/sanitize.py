@@ -79,13 +79,17 @@ def sanitize_email(value: str) -> str:
 
 
 def sanitize_url(value: str) -> str:
-    """Sanitize URL - ensure it's a valid http/https URL."""
+    """Sanitize URL - auto-prefix http/https if omitted, and validate."""
     if not value:
         return ""
     value = value.strip()
-    # Only allow http/https URLs
+    # If scheme is omitted (e.g. "cyprianz.com" or "localhost:8080"), default to https:// (or http:// for localhost/127.0.0.1)
     if not re.match(r"^https?://", value, re.IGNORECASE):
-        return ""
+        if value.lower().startswith(("localhost", "127.0.0.1")):
+            value = f"http://{value}"
+        else:
+            value = f"https://{value}"
+
     # Length limit
     if len(value) > 2048:
         return ""

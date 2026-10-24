@@ -41,15 +41,20 @@ def start_scan():
     data = request.get_json(silent=True) or {}
     
     # Step 1: Validate and sanitize target URL
+    raw_url = (data.get("targetUrl") or "").strip()
+    if raw_url and not raw_url.lower().startswith(("http://", "https://")):
+        if raw_url.lower().startswith(("localhost", "127.0.0.1")):
+            raw_url = f"http://{raw_url}"
+        else:
+            raw_url = f"https://{raw_url}"
+
     try:
-        target_url = sanitize_input(data.get("targetUrl", ""), "url")
+        target_url = sanitize_input(raw_url, "url")
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     
     if not target_url:
-        return jsonify({"error": "targetUrl is required"}), 400
-    if not target_url.startswith(("http://", "https://")):
-        return jsonify({"error": "targetUrl must start with http:// or https://"}), 400
+        return jsonify({"error": "targetUrl is required and must be a valid domain or web address"}), 400
 
     # Step 2: Sanitize parameter list (bounds maximum injection points to 20)
     raw_params = data.get("parameters", [])

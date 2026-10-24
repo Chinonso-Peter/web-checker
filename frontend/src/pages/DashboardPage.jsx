@@ -92,11 +92,26 @@ export default function DashboardPage() {
   const onSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    const trimmed = url.trim();
-    if (!/^https?:\/\/.+/i.test(trimmed)) {
-      setError("Enter a valid URL starting with http:// or https://");
+    let trimmed = url.trim();
+    if (!trimmed) {
+      setError("Please enter a target URL or domain");
       return;
     }
+
+    if (!/^(https?:\/\/)?([a-zA-Z0-9-._]+)(:\d+)?([/\w .?&=%-]*)?$/i.test(trimmed)) {
+      setError("Enter a valid URL or domain name (e.g. cyprianz.com)");
+      return;
+    }
+
+    // Auto-prefix protocol if omitted
+    if (!/^https?:\/\//i.test(trimmed)) {
+      if (/^(localhost|127\.0\.0\.1)/i.test(trimmed)) {
+        trimmed = `http://${trimmed}`;
+      } else {
+        trimmed = `https://${trimmed}`;
+      }
+    }
+
     setLoading(true);
     try {
       const res = await startScan(trimmed);
@@ -136,7 +151,7 @@ export default function DashboardPage() {
                   <input
                     name="targetUrl"
                     className="flex-1 h-10 px-3.5 rounded bg-brand-black border border-brand-border text-white text-xs font-mono placeholder:text-zinc-500 focus:outline-none focus:border-zinc-400"
-                    placeholder="https://example.com"
+                    placeholder="example.com or https://example.com"
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
                     aria-label="Target URL"
